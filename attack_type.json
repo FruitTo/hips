@@ -1,0 +1,36 @@
+{
+  "attack_type": {
+    "DoS/DDoS": [
+      "ICMP Flood",
+      "Syn Flood",
+      "UDP Flood"
+    ],
+    "Port Scan": [
+      "Null Scan",
+      "Full Xmas Scan",
+      " Xmas Scan",
+      "Syn Scan"
+    ],
+    "Brute Force": [
+      "SSH Brute Force",
+      "FTP Brute Force",
+      "Web Brute Force"
+    ],
+    "Path Traversal": [
+      "Directory Traversal",
+      "System File Access Attempt (LFI)"
+    ],
+    "SQL Injection": [
+      "Comment Injection",
+      "AND/OR Injection",
+      "UNION Injection",
+      "Call Function Injection"
+    ],
+    "XSS": [
+      "External Source",
+      "Script Injection",
+      "Event Handler Injection",
+      "Malicious Protocol Injection"
+    ]
+  }
+}
