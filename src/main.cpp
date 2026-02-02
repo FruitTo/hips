@@ -135,6 +135,7 @@ int main(int argc, char *argv[])
               "  --network-config       Generate network configuration file\n"
               "  -v, --version          Show version information\n"
               "  -h, --help             Show this help message\n";
+              "  --uninstall            Uninstalling\n";
     }
     else if (arg == "--uninstall")
     {
