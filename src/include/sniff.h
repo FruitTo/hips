@@ -209,7 +209,7 @@ inline void sniff(NetworkConfig &conf)
     string ip_key = define_ip_key(ip, conf);
 
     // HTTP
-    if (protocol == "http")
+    if (protocol == "http" && conf.HTTP_SERVERS)
     {
       follower.process_packet(pkt);
     }
@@ -461,7 +461,7 @@ inline void sniff(NetworkConfig &conf)
     }
 
     // IF SSH
-    if (protocol == "ssh")
+    if (protocol == "ssh" && conf.SSH_SERVERS)
     {
       auto it_ssh = sshMap.find(ip_key);
       if (it_ssh != sshMap.end())
@@ -530,7 +530,7 @@ inline void sniff(NetworkConfig &conf)
     }
 
     // IF FTP
-    if (protocol == "ftp")
+    if (protocol == "ftp" && conf.FTP_SERVERS)
     {
       auto it_ftp = ftpMap.find(ip_key);
       if (it_ftp != ftpMap.end())

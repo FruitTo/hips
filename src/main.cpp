@@ -146,8 +146,8 @@ int main(int argc, char *argv[])
 
       cout << "Uninstalling HIPS..." << endl;
 
-      system("systemctl stop hips 2>/dev/null");
-      system("systemctl disable hips 2>/dev/null");
+      [[maybe_unused]] int stop_res = system("systemctl stop hips 2>/dev/null");
+      [[maybe_unused]] int dis_res  = system("systemctl disable hips 2>/dev/null");
 
       vector<string> files_to_remove = {
         "/etc/hips_treshold.conf",
@@ -158,7 +158,7 @@ int main(int argc, char *argv[])
 
       for (const auto &file : files_to_remove) {
         try {
-          if (filesystem::exists(file)) 
+          if (filesystem::exists(file))
           {
             filesystem::remove(file);
                     cout << "Removed: " << file << endl;
