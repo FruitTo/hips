@@ -89,7 +89,7 @@ inline void sniff(NetworkConfig &conf)
   // Initial Log Variable
   string currentDay = currentDate();
   string currentTime = timeStamp();
-  string currentPath = "./logs/" + getPath();
+  string currentPath = "/var/log/hips/" + getPath();
   filesystem::create_directories(currentPath);
   auto writer = make_unique<PacketWriter>(currentPath + conf.NAME + "_" + currentDay + "_" + currentTime + ".pcap", DataLinkType<EthernetII>());
 

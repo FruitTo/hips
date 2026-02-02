@@ -136,6 +136,44 @@ int main(int argc, char *argv[])
               "  -v, --version          Show version information\n"
               "  -h, --help             Show this help message\n";
     }
+    else if (arg == "--uninstall")
+    {
+      if (geteuid() != 0) {
+        cerr << "Error: You must run this command as root (sudo)." << endl;
+        return 1;
+      }
+
+      cout << "Uninstalling HIPS..." << endl;
+
+      system("systemctl stop hips 2>/dev/null");
+      system("systemctl disable hips 2>/dev/null");
+
+      vector<string> files_to_remove = {
+        "/etc/hips_treshold.conf",
+        "/etc/hips_network.conf",
+        "/etc/systemd/system/hips.service",
+        "/usr/local/bin/hips"
+      };
+
+      for (const auto &file : files_to_remove) {
+        try {
+          if (filesystem::exists(file)) 
+          {
+            filesystem::remove(file);
+                    cout << "Removed: " << file << endl;
+                } else {
+                    cout << "Skipped (not found): " << file << endl;
+                }
+            } catch (const filesystem::filesystem_error &e) {
+                cerr << "Error removing " << file << ": " << e.what() << endl;
+            }
+        }
+
+        system("systemctl daemon-reload");
+
+        cout << "Uninstallation complete." << endl;
+        return 0;
+    }
     else
     {
       cerr << "Invalid argument: " << arg << endl;
