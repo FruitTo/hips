@@ -16,7 +16,7 @@
 using namespace std;
 using namespace BS;
 
-inline void parsePorts(const std::string &input, std::vector<uint16_t> &target)
+inline void parsePorts(const string &input, vector<uint16_t> &target)
 {
   istringstream iss(input);
   string port_str;
@@ -25,7 +25,7 @@ inline void parsePorts(const std::string &input, std::vector<uint16_t> &target)
   {
     try
     {
-      int port_int = std::stoi(port_str);
+      int port_int = stoi(port_str);
 
       if (port_int > 0 && port_int <= 65535)
       {
@@ -33,16 +33,16 @@ inline void parsePorts(const std::string &input, std::vector<uint16_t> &target)
       }
       else
       {
-        std::cerr << "Warning: Port number " << port_str << " is out of valid range (1-65535) and was skipped." << std::endl;
+        cerr << "Warning: Port number " << port_str << " is out of valid range (1-65535) and was skipped." << endl;
       }
     }
-    catch (const std::invalid_argument &e)
+    catch (const invalid_argument &e)
     {
-      std::cerr << "Warning: Invalid port format '" << port_str << "' found and was skipped." << std::endl;
+      cerr << "Warning: Invalid port format '" << port_str << "' found and was skipped." << endl;
     }
-    catch (const std::out_of_range &e)
+    catch (const out_of_range &e)
     {
-      std::cerr << "Warning: Port number " << port_str << " is too large and was skipped." << std::endl;
+      cerr << "Warning: Port number " << port_str << " is too large and was skipped." << endl;
     }
   }
 }
@@ -55,7 +55,6 @@ int main(int argc, char *argv[])
     cerr << "Warning: You didn't provide any extra arguments!" << endl;
     return 1;
   }
-
   if (argc > 1 && argc < 3)
   {
     string arg = argv[1];
@@ -110,7 +109,9 @@ int main(int argc, char *argv[])
             {
               net_config << ",";
               net_config << conf.HTTP_PORTS[i];
-            } else {
+            }
+            else
+            {
               net_config << conf.HTTP_PORTS[i];
             }
           }
@@ -135,11 +136,12 @@ int main(int argc, char *argv[])
               "  --network-config       Generate network configuration file\n"
               "  -v, --version          Show version information\n"
               "  -h, --help             Show this help message\n";
-              "  --uninstall            Uninstalling\n";
+      "  --uninstall            Uninstalling\n";
     }
     else if (arg == "--uninstall")
     {
-      if (geteuid() != 0) {
+      if (geteuid() != 0)
+      {
         cerr << "Error: You must run this command as root (sudo)." << endl;
         return 1;
       }
@@ -147,33 +149,38 @@ int main(int argc, char *argv[])
       cout << "Uninstalling HIPS..." << endl;
 
       [[maybe_unused]] int stop_res = system("systemctl stop hips 2>/dev/null");
-      [[maybe_unused]] int dis_res  = system("systemctl disable hips 2>/dev/null");
+      [[maybe_unused]] int dis_res = system("systemctl disable hips 2>/dev/null");
 
       vector<string> files_to_remove = {
-        "/etc/hips_treshold.conf",
-        "/etc/hips_network.conf",
-        "/etc/systemd/system/hips.service",
-        "/usr/local/bin/hips"
-      };
+          "/etc/hips_treshold.conf",
+          "/etc/hips_network.conf",
+          "/etc/systemd/system/hips.service",
+          "/usr/local/bin/hips"};
 
-      for (const auto &file : files_to_remove) {
-        try {
+      for (const auto &file : files_to_remove)
+      {
+        try
+        {
           if (filesystem::exists(file))
           {
             filesystem::remove(file);
-                    cout << "Removed: " << file << endl;
-                } else {
-                    cout << "Skipped (not found): " << file << endl;
-                }
-            } catch (const filesystem::filesystem_error &e) {
-                cerr << "Error removing " << file << ": " << e.what() << endl;
-            }
+            cout << "Removed: " << file << endl;
+          }
+          else
+          {
+            cout << "Skipped (not found): " << file << endl;
+          }
         }
+        catch (const filesystem::filesystem_error &e)
+        {
+          cerr << "Error removing " << file << ": " << e.what() << endl;
+        }
+      }
 
-        system("systemctl daemon-reload");
+      system("systemctl daemon-reload");
 
-        cout << "Uninstallation complete." << endl;
-        return 0;
+      cout << "Uninstallation complete." << endl;
+      return 0;
     }
     else
     {
@@ -203,7 +210,8 @@ int main(int argc, char *argv[])
   }
 
   for (auto &t : task)
+  {
     t.wait();
-
+  }
   return 0;
 }
