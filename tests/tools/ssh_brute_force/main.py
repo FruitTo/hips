@@ -4,7 +4,7 @@ import string
 import time
 import socket
 
-TARGET_IP = '192.168.122.209'
+TARGET_IP = '192.168.122.202'
 TARGET_PORT = 22
 USERNAME = 'fruitto'
 MAX_ATTEMPTS = 20
