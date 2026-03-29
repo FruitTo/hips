@@ -12,6 +12,7 @@
 #include "./http_state.h"
 #include "./db_connect.h"
 #include "./network_config.h"
+#include "./config.h"
 
 using namespace Tins;
 using namespace std;
@@ -28,7 +29,7 @@ string url_decode(const string &encoded)
 }
 
 // Forward (client -> server)
-void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, pqxx::connection &conn, bool mode, chrono::minutes ips_timeout)
+void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, pqxx::connection &conn, chrono::minutes ips_timeout, AppConfig &app_config)
 {
   string client_ip = stream.client_addr_v4().to_string();
   int client_port = stream.client_port();
@@ -54,7 +55,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     access_control_detected = true;
     cout << "[ALERT] Directory Traversal Attack Detected! (Pattern: ../../../)" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Block");
@@ -69,7 +70,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     access_control_detected = true;
     cout << "[ALERT] System File Access Attempt (LFI) Detected!" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "System File Access Attempt (LFI)", "Block");
@@ -87,7 +88,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     sql_injection_detected = true;
     cout << "[ALERT] SQL Comment Injection" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Comment Injection", "Block");
@@ -102,7 +103,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     sql_injection_detected = true;
     cout << "[ALERT] SQL AND, OR Injection" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "AND/OR Injection", "Block");
@@ -117,7 +118,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     sql_injection_detected = true;
     cout << "[ALERT] SQL Union Injection" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "UNION Injection", "Block");
@@ -132,7 +133,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     sql_injection_detected = true;
     cout << "[ALERT] SQL Call DB Function" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Call Function Injection", "Block");
@@ -158,7 +159,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       xss_detected = true;
       cout << "[ALERT] XSS Detected (External Source)!" << endl;
-      if (mode)
+      if (app_config.mode)
       {
         block_ip(client_ip, ips_timeout);
         log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "External Source", "Block");
@@ -173,7 +174,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       xss_detected = true;
       cout << "[ALERT] XSS Detected (Dangerous Payload)!" << endl;
-      if (mode)
+      if (app_config.mode)
       {
         block_ip(client_ip, ips_timeout);
         log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Block");
@@ -189,7 +190,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     xss_detected = true;
     cout << "[ALERT] XSS Detected (Event Handler Injection)!" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Block");
@@ -204,7 +205,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   {
     xss_detected = true;
     cout << "[ALERT] XSS Detected (Malicious Protocol)!" << endl;
-    if (mode)
+    if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Malicious Protocol Injection", "Block");
@@ -216,7 +217,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   }
 
   // Brute Force
-  regex http_start_pattern(R"(^(get|post|put|delete|head|options|patch)[\s\+]+([^\s]+))");
+  regex http_start_pattern(R"(^(get|post|put|delete|head|options|patch)[\s\+]+([^?\s]+))");
   smatch url_match;
 
   if (regex_search(lower_data, url_match, http_start_pattern))
@@ -245,7 +246,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
 }
 
 // Backward (server -> client)
-void on_server_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, pqxx::connection &conn, bool mode, chrono::minutes ips_timeout)
+void on_server_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, pqxx::connection &conn, chrono::minutes ips_timeout, AppConfig &app_config)
 {
   string client_ip = stream.client_addr_v4().to_string();
   int client_port = stream.client_port();
@@ -274,13 +275,12 @@ void on_server_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     int max_val = *result.second;
 
     int range = max_val - min_val;
-    if (range >= 0 && range <= 10)
+    if (range >= 0 && range <= app_config.http_byte_len_limit)
     {
       if (http.http_brute_force == false)
       {
         cout << "[ALERT] Brute Focrce Attack Detected" << endl;
-        cout << "Path : " << pending_path << endl;
-        if (mode && http.http_brute_force == false)
+        if (app_config.mode && http.http_brute_force == false)
         {
           block_ip(client_ip, ips_timeout);
           log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Brute Force", "Web Brute Force", "Block");

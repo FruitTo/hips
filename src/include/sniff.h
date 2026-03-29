@@ -123,12 +123,12 @@ inline void sniff(NetworkConfig &conf)
   {
     stream.client_data_callback([&](Stream &s)
     {
-      on_client_data(s, httpMap, conn, app_config.mode, BLOCK_TIMEOUT);
+      on_client_data(s, httpMap, conn, BLOCK_TIMEOUT, app_config);
     });
 
     stream.server_data_callback([&](Stream &s)
     {
-      on_server_data(s, httpMap, conn, app_config.mode, BLOCK_TIMEOUT);
+      on_server_data(s, httpMap, conn, BLOCK_TIMEOUT, app_config);
     });
 
     stream.auto_cleanup_payloads(true);

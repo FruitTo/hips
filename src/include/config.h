@@ -61,6 +61,9 @@ struct AppConfig
   string postgres_host = "localhost";
   string target_session_attrs = "read-write";
 
+  // HTTP-BYTE-LEGNTH
+  int http_byte_len_limit = 10;
+
   bool mode = false;
 };
 
@@ -164,6 +167,10 @@ inline void load_config(const std::string &filename, AppConfig &config)
           config.postgres_port = value;
         else if (key == "POSTGRES_DB")
           config.postgres_db = value;
+
+
+        else if (key == "HTTP_BYTE_LEN_LIMIT")
+          config.http_byte_len_limit = std::stoi(value);
       }
       catch (...)
       {
