@@ -54,7 +54,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, path_traversal_pattern) && !access_control_detected)
   {
     access_control_detected = true;
-    cout << "[ALERT] Directory Traversal Attack Detected! (Pattern: ../../../)" << endl;
+    cout << "[ALERT] Directory Traversal Detected" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -69,7 +69,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   if (regex_search(lower_data, lfi_pattern) && !access_control_detected)
   {
     access_control_detected = true;
-    cout << "[ALERT] System File Access Attempt (LFI) Detected!" << endl;
+    cout << "[ALERT] System File Access Attempt (LFI) Detected" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
@@ -279,7 +279,7 @@ void on_server_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       if (http.http_brute_force == false)
       {
-        cout << "[ALERT] Brute Focrce Attack Detected" << endl;
+        cout << "[ALERT] Web Brute Focrce Detected" << endl;
         if (app_config.mode && http.http_brute_force == false)
         {
           block_ip(client_ip, ips_timeout);

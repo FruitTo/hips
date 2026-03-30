@@ -487,7 +487,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ssh.ssh_brute_force == false)
           {
-            cout << "[ALERT] SSH BRUTE FORCE DETECTED (High Rate): " << ssh.ip << endl;
+            cout << "[ALERT] SSH BRUTE FORCE DETECTED" << endl;
             ssh.ssh_brute_force = true;
             if(app_config.mode && ssh.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
@@ -508,7 +508,7 @@ inline void sniff(NetworkConfig &conf)
         {
           if (ssh.ssh_brute_force == false)
           {
-            cout << "[ALERT] SSH BRUTE FORCE DETECTED (Total Limit): " << ssh.ip << endl;
+            cout << "[ALERT] SSH BRUTE FORCE DETECTED" << endl;
             ssh.ssh_brute_force = true;
             if(app_config.mode && ssh.blocked == false)
             {
