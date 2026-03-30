@@ -18,7 +18,6 @@ This tool is capable of detecting and mitigating the following types of attacks:
   - SYN Scan
   - Null Scan
   - XMAS Scan
-  - Full XMAS Scan
 
 ### 3. Denial of Service (DoS/DDoS)
 - **SYN Flood:** Detects TCP SYN packet flooding.
