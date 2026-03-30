@@ -45,7 +45,7 @@ using SystemClock = chrono::system_clock;
 inline void sniff(NetworkConfig &conf)
 {
   AppConfig app_config;
-  if(app_config.mode)
+  if (app_config.mode)
     cout << "[INFO] IPS Mode Enabled" << endl;
   else
     cout << "[INFO] IDS Mode Disabled" << endl;
@@ -120,7 +120,7 @@ inline void sniff(NetworkConfig &conf)
   StreamFollower follower;
   // Callbacks for new streams
   follower.new_stream_callback([&](Stream &stream)
-  {
+                               {
     stream.client_data_callback([&](Stream &s)
     {
       on_client_data(s, httpMap, conn, BLOCK_TIMEOUT, app_config);
@@ -133,8 +133,7 @@ inline void sniff(NetworkConfig &conf)
 
     stream.auto_cleanup_payloads(true);
     stream.auto_cleanup_client_data(true);
-    stream.auto_cleanup_server_data(true);
-  });
+    stream.auto_cleanup_server_data(true); });
   // Callbacks for terminated streams
   follower.stream_termination_callback([&](Stream &stream, StreamFollower::TerminationReason reason) {});
 
@@ -143,7 +142,7 @@ inline void sniff(NetworkConfig &conf)
   cfg.set_promisc_mode(true);
   Sniffer sniffer(conf.NAME, cfg);
   sniffer.sniff_loop([&](Packet &pkt)
-  {
+                     {
     PDU *pdu = pkt.pdu();
     if (!pdu) return true;
     IP &ip = pdu->rfind_pdu<IP>();
@@ -287,41 +286,53 @@ inline void sniff(NetworkConfig &conf)
         ip_connect.port_list.push_back(port_connect);
       }
 
+      // Port Scan Detection
+      auto duration = ip_connect.last_seen - ip_connect.first_seen;
+      auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
+      bool is_syn = false;
       if (TCP *tcp = pdu->find_pdu<TCP>())
       {
         if (ip.src_addr().to_string() == ip_key && tcp->flags() == TCP::SYN)
         {
+          is_syn = true;
           ip_connect.syn_count++;
         }
-        if (ip.src_addr().to_string() == ip_key && tcp->flags() == 0 && ip_connect.null_scan == false)
-        {
-          cout << "[ALERT] NULL SCAN DETECTED" << endl;
-          ip_connect.null_scan = true;
-          log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Null Scan", "Alert");
-        }
-        if (ip.src_addr().to_string() == ip_key && tcp->flags() == 63 && ip_connect.full_xmas_scan == false)
-        {
-          cout << "[ALERT] TCP FULL XMAS SCAN DETECTED" << endl;
-          ip_connect.full_xmas_scan= true;
-          log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Full Xmas Scan", "Alert");
-        }
-        if (ip.src_addr().to_string() == ip_key && tcp->flags() == 41 && ip_connect.std_xmas_scan == false)
-        {
-          cout << "[ALERT] Standard Nmap Xmas Scan DETECTED" << endl;
-          ip_connect.std_xmas_scan = true;
-          log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", " Xmas Scan", "Alert");
-        }
-      }
 
-      auto duration = ip_connect.last_seen - ip_connect.first_seen;
-      auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
-      if (ip_connect.port_list.size() > PORT_CONNECT_LIMIT && elapsed_seconds <= PORT_CONNECT_DURATION_LIMIT)
-      {
-        if (ip_connect.port_scan == false)
+        if (ip.src_addr().to_string() == ip_key && tcp->flags() == 0)
         {
-          cout << "[ALERT] PORT SCAN DETECTED" << endl;
-          ip_connect.port_scan = true;
-          log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan", "Alert");
+          if(ip_connect.null_scan == false)
+          {
+            cout << "[ALERT] NULL SCAN DETECTED" << endl;
+            ip_connect.null_scan = true;
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Null Scan", "Alert");
+          }
+        }
+        else if (ip.src_addr().to_string() == ip_key && tcp->flags() == 63)
+        {
+          if(ip_connect.std_xmas_scan == false)
+          {
+            cout << "[ALERT] TCP FULL XMAS SCAN DETECTED" << endl;
+            ip_connect.full_xmas_scan= true;
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Full Xmas Scan", "Alert");
+          }
+        }
+        else if (ip.src_addr().to_string() == ip_key && tcp->flags() == 41)
+        {
+          if (ip_connect.std_xmas_scan == false)
+          {
+            cout << "[ALERT] Standard Nmap Xmas Scan DETECTED" << endl;
+            ip_connect.std_xmas_scan = true;
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", " Xmas Scan", "Alert");
+          }
+        }
+        else if (ip_connect.port_list.size() > PORT_CONNECT_LIMIT && elapsed_seconds <= PORT_CONNECT_DURATION_LIMIT && is_syn)
+        {
+          if (ip_connect.port_scan == false)
+          {
+            cout << "[ALERT] PORT SCAN DETECTED" << endl;
+            ip_connect.port_scan = true;
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan", "Alert");
+          }
         }
       }
 
@@ -604,8 +615,7 @@ inline void sniff(NetworkConfig &conf)
     clean_udp_connect(udpConnectMap, UDP_PORT_CONNECT_TIMEOUT);
     clean_icmp_connect(icmpConnectMap, ICMP_CONNECT_TIMEOUT);
     clean_http_state(httpMap, HTTP_TIMEOUT);
-    return true;
-  });
+    return true; });
 }
 
 #endif

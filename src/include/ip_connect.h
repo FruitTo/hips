@@ -39,7 +39,6 @@ void clean_ip_connect(unordered_map<string, IP_Connect> &ipPortMap, chrono::seco
             ++it;
         }
     }
-
 }
 
 #endif
