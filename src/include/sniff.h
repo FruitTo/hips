@@ -354,6 +354,7 @@ inline void sniff(NetworkConfig &conf)
           }
         }
       }
+
     }
     else
     {

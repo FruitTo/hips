@@ -61,8 +61,12 @@ struct AppConfig
   string postgres_host = "localhost";
   string target_session_attrs = "read-write";
 
-  // HTTP-BYTE-LEGNTH
+  // HTTP BYTE LENGTH
   int http_byte_len_limit = 10;
+
+  // IP Count Limit
+  int ip_count_limit = 10000;
+  int ip_count_duration_limit = 100;
 
   bool mode = false;
 };
@@ -171,6 +175,10 @@ inline void load_config(const std::string &filename, AppConfig &config)
 
         else if (key == "HTTP_BYTE_LEN_LIMIT")
           config.http_byte_len_limit = std::stoi(value);
+        else if (key == "IP_COUNT_LIMIT")
+          config.ip_count_limit = std::stoi(value);
+        else if (key == "IP_COUNT_DURATION_LIMIT")
+          config.ip_count_duration_limit = std::stoi(value);
       }
       catch (...)
       {
