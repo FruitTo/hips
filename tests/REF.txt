@@ -1,0 +1,2 @@
+XSS wordlist from https://github.com/ScriptIdiot/XSS-wordlist/blob/master/XSS-WAF.txt
+SQL Injection from https://github.com/HitmanAlharbi/Wordlists/blob/master/SQL-injections-simple
