@@ -235,7 +235,7 @@
     {
       "datasource": {
         "type": "grafana-postgresql-datasource",
-        "uid": "${DS_POSTGRES}"
+        "uid": "Postgres"
       },
       "fieldConfig": {
         "defaults": {
@@ -259,11 +259,8 @@
         "x": 0,
         "y": 4
       },
-      "id": 5,
+      "id": 14,
       "options": {
-        "displayLabels": [
-          "percent"
-        ],
         "legend": {
           "displayMode": "list",
           "placement": "bottom",
@@ -275,7 +272,7 @@
             "lastNotNull"
           ],
           "fields": "",
-          "values": false
+          "values": true
         },
         "sort": "desc",
         "tooltip": {
@@ -287,18 +284,32 @@
       "pluginVersion": "12.4.2",
       "targets": [
         {
-          "datasource": {
-            "type": "grafana-postgresql-datasource",
-            "uid": "${DS_POSTGRES}"
-          },
+          "dataset": "postgres",
           "editorMode": "code",
-          "format": "time_series",
+          "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT\n  $__timeGroupAlias(event_time, $__interval),\n  attack_type AS metric,\n  count(*) AS value\nFROM attack_logs\nWHERE $__timeFilter(event_time)\nGROUP BY 1, 2\nORDER BY 1",
-          "refId": "A"
+          "rawSql": "SELECT\n  attack_type AS metric,\n  COUNT(*) AS value\nFROM attack_logs\nWHERE $__timeFilter(event_time)\nGROUP BY attack_type\nORDER BY value DESC;",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
-      "title": "Attack Summary",
+      "title": "Total Attack",
       "type": "piechart"
     },
     {
@@ -537,8 +548,25 @@
           "editorMode": "code",
           "format": "table",
           "rawQuery": true,
-          "rawSql": "SELECT \n  event_time AS \"Time\", \n  src_addr AS \"Source\", \n  dst_addr AS \"Destination\", \n  dst_port AS \"Port\", \n  attack_type AS \"Type\", \n  attack_detail AS \"Detail\", \n  response_type AS \"Action\" \nFROM attack_logs \nWHERE $__timeFilter(event_time)\nORDER BY event_time DESC\nLIMIT 50",
-          "refId": "A"
+          "rawSql": "SELECT \n  event_time AS \"Time\", \n  src_addr AS \"Source\", \n  dst_addr AS \"Destination\", \n  dst_port AS \"Port\", \n  attack_type AS \"Type\", \n  attack_detail AS \"Detail\", \n  response_type AS \"Action\" \nFROM attack_logs \nWHERE $__timeFilter(event_time)\nORDER BY event_time ASC",
+          "refId": "A",
+          "sql": {
+            "columns": [
+              {
+                "parameters": [],
+                "type": "function"
+              }
+            ],
+            "groupBy": [
+              {
+                "property": {
+                  "type": "string"
+                },
+                "type": "groupBy"
+              }
+            ],
+            "limit": 50
+          }
         }
       ],
       "title": "Recent Attack Events",
