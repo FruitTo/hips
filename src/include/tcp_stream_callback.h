@@ -83,8 +83,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
 
   // SQL Injection
   bool sql_injection_detected = false;
-  // regex sql_comment_pattern(R"((--[ \t'"+])|(/\*.*\*/(?!\*)))");  // Comment
-  static const regex sql_comment_pattern(R"((--[\s\t'"+\-]|--$|--\r?$)|(/\*[\s\S]*?\*/)|(\s#(\s|$)))");  // Comment
+  static const regex sql_comment_pattern(R"(((?:^|\s)--\s+.*)|(?:^|[\s;])\/\*[\s\S]*?\*\/)");  // Comment
   if (regex_search(lower_data, sql_comment_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -99,7 +98,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Comment Injection", "Alert");
     }
   }
-  static regex and_or_pattern(R"((\b(and|or)|\|\||&&)([\s\+]+|\*.*?\*|['"(])+(\w|\s)*([\s\+]|['")])*(?:!=|>=|<=|=|>|<|like)+)"); // AND OR
+  static const regex and_or_pattern(R"((\b(and|or)|\|\||&&)([\s\+]+|\*.*?\*|['"(])+(\w|\s)*([\s\+]|['")])*(?:!=|>=|<=|=|>|<|like)+)"); // AND OR
   if (regex_search(lower_data, and_or_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -114,7 +113,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "AND/OR Injection", "Alert");
     }
   }
-  static regex order_by_pattern(R"(['")\s\+]*\b(order|ororderder)\b[\s\+]*\bby\b[\s\+]*\d+[\s\+]*\/\*)"); // Order By
+  static const regex order_by_pattern(R"(['")\s\+]*\b(order|ororderder)\b[\s\+]*\bby\b[\s\+]*\d+[\s\+]*\/\*)"); // Order By
   if (regex_search(lower_data, order_by_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -129,7 +128,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Order By Injection", "Alert");
     }
   }
-  static regex union_pattern(R"(\bunion([\s\+]+|/\*.*?\*/|\()+?(all([\s\+]+|/\*.*?\*/)+)?select\b)"); // UNION
+  static const regex union_pattern(R"(\bunion([\s\+]+|/\*.*?\*/|\()+?(all([\s\+]+|/\*.*?\*/)+)?select\b)"); // UNION
   if (regex_search(lower_data, union_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -144,7 +143,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "UNION Injection", "Alert");
     }
   }
-  static regex call_func_pattern(R"(\b(sleep|benchmark|extractvalue|updatexml|load_file|pg_sleep|user|database|version|schema|current_user|system_user|group_concat|concat_ws|hex|unhex|geometrycollection|polygon|multipoint|linestring|pg_read_file|pg_ls_dir|xp_cmdshell)[\s\+]*\(.*\))"); // Function
+  static const regex call_func_pattern(R"(\b(sleep|benchmark|extractvalue|updatexml|load_file|pg_sleep|user|database|version|schema|current_user|system_user|group_concat|concat_ws|hex|unhex|geometrycollection|polygon|multipoint|linestring|pg_read_file|pg_ls_dir|xp_cmdshell)[\s\+]*\(.*\))"); // Function
   if (regex_search(lower_data, call_func_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;

