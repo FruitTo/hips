@@ -45,12 +45,12 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   string lower_data = decoded_data;
   transform(lower_data.begin(), lower_data.end(), lower_data.begin(), ::tolower);
 
-  regex ref_pattern(R"((\r?\n)?referer:\s*[^\r\n]*)");
+  static regex ref_pattern(R"((\r?\n)?referer:\s*[^\r\n]*)");
   lower_data = regex_replace(lower_data, ref_pattern, "");
 
   // Broken Access Control
   bool access_control_detected = false;
-  regex path_traversal_pattern(R"(((\.|%2e){2,}(\/|\\|%2f|%5c)){3,})");
+  static regex path_traversal_pattern(R"(((\.|%2e){2,}(\/|\\|%2f|%5c)){3,})");
   if (regex_search(lower_data, path_traversal_pattern) && !access_control_detected)
   {
     access_control_detected = true;
@@ -65,7 +65,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Alert");
     }
   }
-  regex lfi_pattern(R"(/etc/(passwd|shadow|hosts)|[c-zc-z]:\\windows)");
+  static regex lfi_pattern(R"(/etc/(passwd|shadow|hosts)|[c-zc-z]:\\windows)");
   if (regex_search(lower_data, lfi_pattern) && !access_control_detected)
   {
     access_control_detected = true;
@@ -83,7 +83,8 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
 
   // SQL Injection
   bool sql_injection_detected = false;
-  regex sql_comment_pattern(R"((--[ \t'"+])|(/\*.*\*/(?!\*)))"); // Comment
+  // regex sql_comment_pattern(R"((--[ \t'"+])|(/\*.*\*/(?!\*)))");  // Comment
+  static const regex sql_comment_pattern(R"((--[\s\t'"+\-]|--$|--\r?$)|(/\*[\s\S]*?\*/)|(\s#(\s|$)))");  // Comment
   if (regex_search(lower_data, sql_comment_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -98,7 +99,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Comment Injection", "Alert");
     }
   }
-  regex and_or_pattern(R"(\b(and|or)(?:[\s\+]+|/\*.*?\*/|['"(])+\w*['"]?[\s\+]*(?:!=|>=|<=|=|>|<|like)+[\s\+]*['"]?\w*['")]?)"); // AND OR
+  static regex and_or_pattern(R"((\b(and|or)|\|\||&&)([\s\+]+|\*.*?\*|['"(])+(\w|\s)*([\s\+]|['")])*(?:!=|>=|<=|=|>|<|like)+)"); // AND OR
   if (regex_search(lower_data, and_or_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -113,7 +114,22 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "AND/OR Injection", "Alert");
     }
   }
-  regex union_pattern(R"(\bunion([\s\+]+|/\*.*?\*/|\()+?(all([\s\+]+|/\*.*?\*/)+)?select\b)"); // UNION
+  static regex order_by_pattern(R"(['")\s\+]*\b(order|ororderder)\b[\s\+]*\bby\b[\s\+]*\d+[\s\+]*\/\*)"); // Order By
+  if (regex_search(lower_data, order_by_pattern) && !sql_injection_detected)
+  {
+    sql_injection_detected = true;
+    cout << "[ALERT] SQL Order By Injection" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Order By Injection", "Block");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "Order By Injection", "Alert");
+    }
+  }
+  static regex union_pattern(R"(\bunion([\s\+]+|/\*.*?\*/|\()+?(all([\s\+]+|/\*.*?\*/)+)?select\b)"); // UNION
   if (regex_search(lower_data, union_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -128,7 +144,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "SQL Injection", "UNION Injection", "Alert");
     }
   }
-  regex call_func_pattern(R"(\b(sleep|benchmark|extractvalue|updatexml|load_file|pg_sleep|user|database|version|schema|current_user|system_user|group_concat|concat_ws|hex|unhex|geometrycollection|polygon|multipoint|linestring|pg_read_file|pg_ls_dir|xp_cmdshell)[\s\+]*\(.*\))"); // Function
+  static regex call_func_pattern(R"(\b(sleep|benchmark|extractvalue|updatexml|load_file|pg_sleep|user|database|version|schema|current_user|system_user|group_concat|concat_ws|hex|unhex|geometrycollection|polygon|multipoint|linestring|pg_read_file|pg_ls_dir|xp_cmdshell)[\s\+]*\(.*\))"); // Function
   if (regex_search(lower_data, call_func_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -146,7 +162,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
 
   // Cross Site Scripting
   bool xss_detected = false;
-  regex check_script_pattern(R"(<script([^>]*)>([\s\S\+]*?)<\/script>)");
+  static regex check_script_pattern(R"(<script([^>]*)>([\s\S\+]*?)<\/script>)");
   auto words_begin = sregex_iterator(lower_data.begin(), lower_data.end(), check_script_pattern);
   auto words_end = sregex_iterator();
   for (sregex_iterator i = words_begin; i != words_end; ++i)
@@ -154,7 +170,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     smatch match = *i;
     string script_attr = match[1].str();
     string script_body = match[2].str();
-    regex check_src_pattern(R"(src[\s\+/]*=[\s\+/]*['"]?[\s\+]*(https?:|\/\/|data:|javascript:))");
+    static regex check_src_pattern(R"(src[\s\+/]*=[\s\+/]*['"]?[\s\+]*(https?:|\/\/|data:|javascript:))");
     if (regex_search(script_attr, check_src_pattern) && !xss_detected)
     {
       xss_detected = true;
@@ -169,7 +185,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
         log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "External Source", "Alert");
       }
     }
-    regex js_payload(R"((document\.cookie|localstorage\.getitem|fetch[\s\+]*\(|document\.location|history\.replacestate|document\.write|window\.location|eval[\s\+]*\(|document\.onkeypress|alert[\s\+]*\(|prompt[\s\+]*\(|confirm[\s\+]*\())");
+    static regex js_payload(R"((document\.cookie|localstorage\.getitem|fetch[\s\+]*\(|document\.location|history\.replacestate|document\.write|window\.location|eval[\s\+]*\(|document\.onkeypress|alert[\s\+]*\(|prompt[\s\+]*\(|confirm[\s\+]*\())");
     if (regex_search(script_body, js_payload) && !xss_detected)
     {
       xss_detected = true;
@@ -185,7 +201,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       }
     }
   }
-  regex check_event_pattern(R"([\s/\"'+>]+on(load|error|mouseover|focus|click|submit|keypress|change|input|mouseenter|mouseleave)[\s\+]*=[\s\+]*)");
+  static regex check_event_pattern(R"([\s/\"'+>]+on(load|error|mouseover|focus|click|submit|keypress|change|input|mouseenter|mouseleave)[\s\+]*=[\s\+]*)");
   if (regex_search(lower_data, check_event_pattern) && !xss_detected)
   {
     xss_detected = true;
@@ -200,7 +216,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Alert");
     }
   }
-  regex check_pseudo_protocol(R"((src|href|action|formaction)[\s\+/]*=[\s\+/]*['"]?[\s\+]*(javascript:|vbscript:|data:text\/html))");
+  static regex check_pseudo_protocol(R"((src|href|action|formaction)[\s\+/]*=[\s\+/]*['"]?[\s\+]*(javascript:|vbscript:|data:text\/html))");
   if (regex_search(lower_data, check_pseudo_protocol) && !xss_detected)
   {
     xss_detected = true;
@@ -217,7 +233,7 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   }
 
   // Brute Force
-  regex http_start_pattern(R"(^(get|post|put|delete|head|options|patch)[\s\+]+([^?\s]+))");
+  static regex http_start_pattern(R"(^(get|post|put|delete|head|options|patch)[\s\+]+([^?\s]+))");
   smatch url_match;
 
   if (regex_search(lower_data, url_match, http_start_pattern))
