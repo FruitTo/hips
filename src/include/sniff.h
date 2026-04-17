@@ -482,13 +482,14 @@ inline void sniff(NetworkConfig &conf)
         SSH_State &ssh = it_ssh->second;
         ssh.last_seen = SystemClock::now();
         auto duration = ssh.last_seen - ssh.first_seen;
-        auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
+        auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration).count();
+        long safe_elapsed = (elapsed_seconds > 0) ? elapsed_seconds : 1;
         ssh_read_fail_state(BTMP_PATH, ssh);
-        if (elapsed_seconds < SSH_DURATION_LIMIT && ssh.login_fail > SSH_LOGIN_FAIL_DURATION_LIMIT)
+        if ((ssh.login_fail / safe_elapsed) * SSH_DURATION_LIMIT.count() > SSH_LOGIN_FAIL_DURATION_LIMIT)
         {
           if (ssh.ssh_brute_force == false)
           {
-            cout << "[ALERT] SSH BRUTE FORCE DETECTED" << endl;
+            cout << "[ALERT] SSH BRUTE FORCE DETECTED RATE" << endl;
             ssh.ssh_brute_force = true;
             if(app_config.mode && ssh.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
@@ -551,13 +552,14 @@ inline void sniff(NetworkConfig &conf)
         FTP_State &ftp = it_ftp->second;
         ftp.last_seen = SystemClock::now();
         auto duration = ftp.last_seen - ftp.first_seen;
-        auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
+        auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration).count();
+        long safe_elapsed = (elapsed_seconds > 0) ? elapsed_seconds : 1;
         ftp_read_fail_state(VSFTPD_LOG_PATH, ftp);
-        if (elapsed_seconds < FTP_DURATION_LIMIT && ftp.login_fail > FTP_LOGIN_FAIL_DURATION_LIMIT)
+        if ((ftp.login_fail / safe_elapsed) * FTP_DURATION_LIMIT.count() > FTP_LOGIN_FAIL_DURATION_LIMIT)
         {
           if (ftp.ftp_brute_force == false)
           {
-            cout << "[ALERT] FTP BRUTE FORCE DETECTED" << endl;
+            cout << "[ALERT] FTP BRUTE FORCE DETECTED RATE" << endl;
             ftp.ftp_brute_force = true;
             if(app_config.mode && ftp.blocked == false) {
               block_ip(client_ip, BLOCK_TIMEOUT);
