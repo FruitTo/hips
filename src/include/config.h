@@ -34,8 +34,9 @@ struct AppConfig
   int port_connect_duration_limit = 30;
 
   // --- SYN Flood ---
-  int syn_connect_limit = 100;
-  int syn_connect_duration_limit = 30;
+  // int syn_connect_limit = 100;
+  // int syn_connect_duration_limit = 30;
+  int syn_pps_limit = 30000;
 
   // --- UDP Flood ---
   int unreach_count_limit = 30;
@@ -124,10 +125,8 @@ inline void load_config(const std::string &filename, AppConfig &config)
         else if (key == "PORT_CONNECT_DURATION_LIMIT")
           config.port_connect_duration_limit = std::stoi(value);
 
-        else if (key == "SYN_CONNECT_LIMIT")
-          config.syn_connect_limit = std::stoi(value);
-        else if (key == "SYN_CONNECT_DURATION_LIMIT")
-          config.syn_connect_duration_limit = std::stoi(value);
+        else if (key == "SYN_PPS_LIMIT")
+          config.syn_pps_limit = std::stoi(value);
 
         else if (key == "UNREACH_COUNT_LIMIT")
           config.unreach_count_limit = std::stoi(value);

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-TARGET="192.168.122.141"
+TARGET="192.168.122.109"
 USERNAME="fruitto"
 WORDLIST="wordlist_test.txt"
 

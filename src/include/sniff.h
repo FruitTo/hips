@@ -65,8 +65,7 @@ inline void sniff(NetworkConfig &conf)
   const int PORT_CONNECT_LIMIT = app_config.port_connect_limit;
   const chrono::seconds PORT_CONNECT_DURATION_LIMIT = chrono::seconds(app_config.port_connect_duration_limit);
 
-  const int SYN_CONNECT_LIMIT = app_config.syn_connect_limit;
-  const chrono::seconds SYN_CONNECT_DURATION_LIMIT = chrono::seconds(app_config.syn_connect_duration_limit);
+  const int SYN_PPS_LIMIT = app_config.syn_pps_limit;
 
   const int UNREACH_COUNT_LIMIT = app_config.unreach_count_limit;
   const int UDP_PPS_LIMIT = app_config.udp_pps_limit;
@@ -227,8 +226,7 @@ inline void sniff(NetworkConfig &conf)
         auto elapsed_seconds = chrono::duration_cast<chrono::seconds>(duration);
         if (elapsed_seconds.count() > 0.0)
         {
-          double pps = icmp_connect.packet_count / elapsed_seconds.count();
-          if (pps > ICMP_PPS_LIMIT && icmp_connect.icmp_flood == false)
+          if ((icmp_connect.packet_count / elapsed_seconds.count()) > ICMP_PPS_LIMIT && icmp_connect.icmp_flood == false)
           {
             cout << "[ALERT] ICMP Flood DETECTED" << endl;
             icmp_connect.icmp_flood = true;
@@ -331,15 +329,15 @@ inline void sniff(NetworkConfig &conf)
           {
             cout << "[ALERT] PORT SCAN DETECTED" << endl;
             ip_connect.port_scan = true;
-            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan", "Alert");
+            log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Port Scan", "Syn Scan/Full Scan", "Alert");
           }
         }
       }
 
       // Alert SYN Flood
-      if (ip_connect.syn_count > SYN_CONNECT_LIMIT && elapsed_seconds <= SYN_CONNECT_DURATION_LIMIT)
+      if (elapsed_seconds.count() > 0)
       {
-        if (ip_connect.syn_flood == false)
+        if ((ip_connect.syn_count / elapsed_seconds.count()) > SYN_PPS_LIMIT && ip_connect.syn_flood == false)
         {
           cout << "[ALERT] SYN FLOOD DETECTED" << endl;
           ip_connect.syn_flood = true;
@@ -354,7 +352,6 @@ inline void sniff(NetworkConfig &conf)
           }
         }
       }
-
     }
     else
     {
