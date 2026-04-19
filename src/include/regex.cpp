@@ -1,20 +1,50 @@
   // XSS Patterns
-  static const regex script_tag_pattern("<\\s*script[^>]*>|<\\s*/\\s*script\\s*>", regex::icase);
-  static const regex encoded_script_pattern("%(3c|3C)\\s*script", regex::icase);
-  static const regex split_script_pattern("<\\s*\\w+\\s+<\\s*script|<\\s*/\\s*\\w+\\s+<\\s*script|<\\s*\\w+\\s+</\\s*script", regex::icase);
-  static const regex expression_pattern("x?\\s*expression\\s*\\(|/\\s*x\\s*pression\\s*\\(", regex::icase);
-  static const regex style_xss_pattern("style\\s*=.*(font-family|expression)[^;]*['\"(]", regex::icase);
-  static const regex java_protocol_pattern("href\\s*=\\s*[\"']?\\s*java\\s*[:&]", regex::icase);
-  static const regex encoded_event_pattern("%(6f|6F)(6e|6E)(l|4c)(o|4F)(a|41)(d|44)(%3d|=)", regex::icase);
-  static const regex imap4_xss_pattern("x-imap4-modified-utf7.*(script|alert|java)", regex::icase);
-  static const regex js_obfuscation_pattern("alert\\s*;\\s*pg\\s*\\(", regex::icase);
-  static const regex event_handler_pattern("\\bon(load|error|click|mouseover|mouseout|focus|blur|submit|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll|touchstart|touchend|animationstart|transitionend)\\s*=", regex::icase);
-  static const regex js_uri_pattern("(javascript|vbscript|data)\\s*:", regex::icase);
-  static const regex html_tag_pattern("<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee|isindex|form|button|select|textarea|table|div|span|a|font|center|applet|frameset|frame|layer|style|base|link|meta)", regex::icase);
-  static const regex dangerous_func_pattern("\\b(alert|prompt|confirm|eval|setTimeout|setInterval|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(", regex::icase);
-  static const regex encoding_pattern("String\\.fromCharCode|\\\\x[0-9a-fA-F]{2}|\\\\u[0-9a-fA-F]{4}|&#[0-9]+;|&#x[0-9a-fA-F]+;", regex::icase);
-  static const regex css_injection_pattern("expression\\s*\\(|url\\s*\\(\\s*javascript:|behavior\\s*:|moz-binding\\s*:", regex::icase);
-  static const regex dom_manipulation_pattern("\\b(document\\.cookie|document\\.domain|window\\.location|document\\.location|window\\.name)\\b", regex::icase);
+  static const regex script_injection_pattern(
+    "<\\s*script[^>]*>"               // <script ...>
+    "|<\\s*/\\s*script\\s*>"          // </script>
+    "|%(3c|3C)\\s*script"             // %3cscript (URL-encoded)
+    "|<\\s*\\w+\\s+<\\s*script"       // <tag <script  (split evasion)
+    "|<\\s*/\\s*\\w+\\s+<\\s*script"  // </tag <script
+    "|<\\s*\\w+\\s+</\\s*script"     // <tag </script
+  );
+  static const regex protocol_injection_pattern(
+    "(javascript|vbscript|data)\\s*:"        // javascript: / vbscript: / data:
+    "|href\\s*=\\s*[\"']?\\s*java\\s*[:&]"   // href="java: หรือ java&colon;
+  );
+  static const regex css_xss_pattern(
+    "x?\\s*expression\\s*\\("                           // expression( / xpression(
+    "|/\\s*x\\s*pression\\s*\\("                        // /xpression( (split evasion)
+    "|style\\s*=.*(font-family|expression)[^;]*['\"(]"  // style= ที่มี expression
+    "|url\\s*\\(\\s*javascript:"                        // url(javascript:
+    "|behavior\\s*:"                                    // behavior: (IE)
+    "|moz-binding\\s*:"                                 // -moz-binding: (Firefox)
+  );
+  static const regex event_injection_pattern(
+    "\\bon(load|error|click|mouseover|mouseout|focus|blur|submit"
+    "|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll"
+    "|touchstart|touchend|animationstart|transitionend)\\s*="  // onXXX=
+    "|%(6f|6F)(6e|6E)(4c|6c)(4F|6f)(41|61)(44|64)(%3d|=)"   // %6f%6e%6c%6f%61%64= (onload)
+  );
+  static const regex js_execution_pattern(
+    "\\b(alert|prompt|confirm|eval|setTimeout|setInterval"
+    "|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(" // dangerous functions
+    "|\\b(document\\.cookie|document\\.domain"
+    "|window\\.location|document\\.location|window\\.name)\\b"          // DOM access
+    "|alert\\s*;\\s*pg\\s*\\("                                          // obfuscated alert;pg(
+  );
+  static const regex dangerous_tag_pattern(
+    "<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee"
+    "|isindex|form|button|select|textarea|table|div|span|a|font|center"
+    "|applet|frameset|frame|layer|style|base|link|meta)"
+  );
+  static const regex obfuscation_pattern(
+    "String\\.fromCharCode"             // String.fromCharCode(...)
+    "|\\\\x[0-9a-fA-F]{2}"             // \x41
+    "|\\\\u[0-9a-fA-F]{4}"             // \u0041
+    "|&#[0-9]+;"                        // &#65;
+    "|&#x[0-9a-fA-F]+;"                // &#x41;
+    "|x-imap4-modified-utf7.*(script|alert|java)"  // IMAP4 UTF-7 bypass
+  );
 
   // SQL
   static const regex sql_comment_pattern(R"(((?:^|\s)--\s+.*)|(?:^|[\s;])\/\*[\s\S]*?\*\/)");  // Comment
@@ -26,3 +56,10 @@
   // Broken Access Control
   static regex path_traversal_pattern(R"(((\.|%2e){2,}(\/|\\|%2f|%5c)){3,})");
   static regex lfi_pattern(R"(/etc/(passwd|shadow|hosts)|[c-zc-z]:\\windows)");
+
+  static const regex path_traversal_pattern(
+    R"((\.\.(\/|\\))+|etc\/(passwd|shadow|hosts))"
+  );
+  static const regex lfi_pattern(
+    R"((etc\/(passwd|shadow|hosts|group|issue)|[c-z]:\\|boot\.ini|win\.ini|\.htaccess|cmd\.exe|global\.asa|desktop\.ini|bin\/(cat|id|ls|sh|bash)))"
+  );

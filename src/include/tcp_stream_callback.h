@@ -23,42 +23,78 @@ using Tins::TCPIP::StreamFollower;
 
 string url_decode(const string &encoded)
 {
-  string result;
-  result.reserve(encoded.length());
-  for (size_t i = 0; i < encoded.length(); ++i) {
-    if (encoded[i] == '%' && i + 2 < encoded.length()) {
-      string hex = encoded.substr(i + 1, 2);
-      char c = static_cast<char>(stoi(hex, nullptr, 16));
-      result += c;
-      i += 2;
-    } else if (encoded[i] == '+') {
-      result += ' ';
-    } else {
-      result += encoded[i];
+  auto decode_once = [](const string &input) -> string
+  {
+    string result;
+    result.reserve(input.length());
+    for (size_t i = 0; i < input.length(); ++i)
+    {
+      if (input[i] == '%' && i + 2 < input.length())
+      {
+        string hex = input.substr(i + 1, 2);
+        try
+        {
+          char c = static_cast<char>(stoi(hex, nullptr, 16));
+          result += c;
+        }
+        catch (const std::exception &e)
+        {
+          result += "%" + hex;
+        }
+        i += 2;
+      }
+      else if (input[i] == '+')
+      {
+        result += ' ';
+      }
+      else
+      {
+        result += input[i];
+      }
     }
-  }
+    return result;
+  };
+
+  string result = decode_once(encoded);
+  result = decode_once(result);
   return result;
 }
 
 string html_entity_decode(const string &data)
 {
-  string result = data;
+  string result;
+  string temp = data;
+  smatch match;
 
   regex hex_entity(R"(&#[xX]([0-9a-fA-F]+);)");
-  for (sregex_iterator it(result.begin(), result.end(), hex_entity), end; it != end; ++it) {
-    string hex = (*it)[1].str();
-    int code = stoi(hex, nullptr, 16);
-    string replacement(1, static_cast<char>(code));
-    result.replace(it->position(), it->length(), replacement);
+  while (regex_search(temp, match, hex_entity))
+  {
+    result += match.prefix().str();
+    try {
+      int code = stoi(match[1].str(), nullptr, 16);
+      result += string(1, static_cast<char>(code));
+    } catch (const exception& e) {
+      result += match[0].str();
+    }
+    temp = match.suffix().str();
   }
+  result += temp;
 
+  temp = result;
+  result = "";
   regex dec_entity(R"(&#([0-9]+);)");
-  for (sregex_iterator it(result.begin(), result.end(), dec_entity), end; it != end; ++it) {
-    string dec = (*it)[1].str();
-    int code = stoi(dec);
-    string replacement(1, static_cast<char>(code));
-    result.replace(it->position(), it->length(), replacement);
+  while (regex_search(temp, match, dec_entity))
+  {
+    result += match.prefix().str();
+    try {
+      int code = stoi(match[1].str());
+      result += string(1, static_cast<char>(code));
+    } catch (const exception& e) {
+      result += match[0].str();
+    }
+    temp = match.suffix().str();
   }
+  result += temp;
 
   result = regex_replace(result, regex("&lt;"), "<");
   result = regex_replace(result, regex("&gt;"), ">");
@@ -69,15 +105,34 @@ string html_entity_decode(const string &data)
   return result;
 }
 
-void save_xss_result(const string &payload, bool detected, const string &attack_type, const string &action)
+// void save_xss_result(const string &payload, bool detected, const string &attack_type, const string &action)
+// {
+//   static mutex file_mutex;
+//   lock_guard<mutex> lock(file_mutex);
+//   ofstream outfile("xss_detection_log.txt", ios::app);
+//   if (outfile.is_open()) {
+//     if (detected) {
+//       outfile << "[" << action << "] " << attack_type << " | " << payload << endl;
+//     } else {
+//       outfile << "[BYPASSED] No pattern matched | " << payload << endl;
+//     }
+//     outfile.close();
+//   }
+// }
+
+void save_traversal_result(const string &payload, bool detected, const string &attack_type, const string &action)
 {
   static mutex file_mutex;
   lock_guard<mutex> lock(file_mutex);
-  ofstream outfile("xss_detection_log.txt", ios::app);
-  if (outfile.is_open()) {
-    if (detected) {
+  ofstream outfile("traversal_detection_log.txt", ios::app);
+  if (outfile.is_open())
+  {
+    if (detected)
+    {
       outfile << "[" << action << "] " << attack_type << " | " << payload << endl;
-    } else {
+    }
+    else
+    {
       outfile << "[BYPASSED] No pattern matched | " << payload << endl;
     }
     outfile.close();
@@ -96,13 +151,14 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   const Stream::payload_type &payload = stream.client_payload();
   string data(payload.begin(), payload.end());
 
-
   static regex ref_pattern(R"((\r?\n)referer:[^\r\n]*)");
   data = regex_replace(data, ref_pattern, "");
   string decoded_data = url_decode(data);
   decoded_data = html_entity_decode(decoded_data);
-  for (size_t i = 0; i < decoded_data.length(); ++i) {
-    if (decoded_data[i] == '+') decoded_data[i] = ' ';
+  for (size_t i = 0; i < decoded_data.length(); ++i)
+  {
+    if (decoded_data[i] == '+')
+      decoded_data[i] = ' ';
   }
 
   smatch match;
@@ -110,42 +166,9 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   string lower_data = decoded_data;
   transform(lower_data.begin(), lower_data.end(), lower_data.begin(), ::tolower);
 
-  // Broken Access Control
-  bool access_control_detected = false;
-  static regex path_traversal_pattern(R"(((\.|%2e){2,}(\/|\\|%2f|%5c)){3,})");
-  if (regex_search(lower_data, path_traversal_pattern) && !access_control_detected)
-  {
-    access_control_detected = true;
-    cout << "[ALERT] Directory Traversal Detected" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Block");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Alert");
-    }
-  }
-  static regex lfi_pattern(R"(/etc/(passwd|shadow|hosts)|[c-zc-z]:\\windows)");
-  if (regex_search(lower_data, lfi_pattern) && !access_control_detected)
-  {
-    access_control_detected = true;
-    cout << "[ALERT] System File Access Attempt (LFI) Detected" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "System File Access Attempt (LFI)", "Block");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "System File Access Attempt (LFI)", "Alert");
-    }
-  }
-
   // SQL Injection
   bool sql_injection_detected = false;
-  static const regex sql_comment_pattern(R"(((?:^|\s)--\s+.*)|(?:^|[\s;])\/\*[\s\S]*?\*\/)");  // Comment
+  static const regex sql_comment_pattern(R"(((?:^|\s)--\s+.*)|(?:^|[\s;])\/\*[\s\S]*?\*\/)"); // Comment
   if (regex_search(lower_data, sql_comment_pattern) && !sql_injection_detected)
   {
     sql_injection_detected = true;
@@ -224,12 +247,12 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
   // Cross Site Scripting (XSS)
   bool xss_detected = false;
   static const regex script_injection_pattern(
-    "<\\s*script[^>]*>"               // <script ...>
-    "|<\\s*/\\s*script\\s*>"          // </script>
-    "|%(3c|3C)\\s*script"             // %3cscript (URL-encoded)
-    "|<\\s*\\w+\\s+<\\s*script"       // <tag <script  (split evasion)
-    "|<\\s*/\\s*\\w+\\s+<\\s*script"  // </tag <script
-    "|<\\s*\\w+\\s+</\\s*script"     // <tag </script
+      "<\\s*script[^>]*>"              // <script ...>
+      "|<\\s*/\\s*script\\s*>"         // </script>
+      "|%(3c|3C)\\s*script"            // %3cscript (URL-encoded)
+      "|<\\s*\\w+\\s+<\\s*script"      // <tag <script  (split evasion)
+      "|<\\s*/\\s*\\w+\\s+<\\s*script" // </tag <script
+      "|<\\s*\\w+\\s+</\\s*script"     // <tag </script
   );
   if (regex_search(lower_data, script_injection_pattern) && !xss_detected)
   {
@@ -239,18 +262,18 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Block");
-      save_xss_result(lower_data, true, "Script Tag Injection", "BLOCK");
+      // save_xss_result(lower_data, true, "Script Tag Injection", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Alert");
-      save_xss_result(lower_data, true, "Script Tag Injection", "ALERT");
+      // save_xss_result(lower_data, true, "Script Tag Injection", "ALERT");
     }
   }
 
   static const regex protocol_injection_pattern(
-    "(javascript|vbscript|data)\\s*:"        // javascript: / vbscript: / data:
-    "|href\\s*=\\s*[\"']?\\s*java\\s*[:&]"   // href="java: หรือ java&colon;
+      "(javascript|vbscript|data)\\s*:"      // javascript: / vbscript: / data:
+      "|href\\s*=\\s*[\"']?\\s*java\\s*[:&]" // href="java: หรือ java&colon;
   );
   if (regex_search(lower_data, protocol_injection_pattern) && !xss_detected)
   {
@@ -260,22 +283,22 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Block");
-      save_xss_result(lower_data, true, "Protocol Injection", "BLOCK");
+      // save_xss_result(lower_data, true, "Protocol Injection", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Alert");
-      save_xss_result(lower_data, true, "Protocol Injection", "ALERT");
+      // save_xss_result(lower_data, true, "Protocol Injection", "ALERT");
     }
   }
 
   static const regex css_xss_pattern(
-    "x?\\s*expression\\s*\\("                           // expression( / xpression(
-    "|/\\s*x\\s*pression\\s*\\("                        // /xpression( (split evasion)
-    "|style\\s*=.*(font-family|expression)[^;]*['\"(]"  // style= ที่มี expression
-    "|url\\s*\\(\\s*javascript:"                        // url(javascript:
-    "|behavior\\s*:"                                    // behavior: (IE)
-    "|moz-binding\\s*:"                                 // -moz-binding: (Firefox)
+      "x?\\s*expression\\s*\\("                          // expression( / xpression(
+      "|/\\s*x\\s*pression\\s*\\("                       // /xpression( (split evasion)
+      "|style\\s*=.*(font-family|expression)[^;]*['\"(]" // style= ที่มี expression
+      "|url\\s*\\(\\s*javascript:"                       // url(javascript:
+      "|behavior\\s*:"                                   // behavior: (IE)
+      "|moz-binding\\s*:"                                // -moz-binding: (Firefox)
   );
   if (regex_search(lower_data, css_xss_pattern) && !xss_detected)
   {
@@ -285,20 +308,20 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS Injection", "Block");
-      save_xss_result(lower_data, true, "CSS Injection", "BLOCK");
+      // save_xss_result(lower_data, true, "CSS Injection", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "CSS Injection", "Alert");
-      save_xss_result(lower_data, true, "CSS Injection", "ALERT");
+      // save_xss_result(lower_data, true, "CSS Injection", "ALERT");
     }
   }
 
   static const regex event_injection_pattern(
-    "\\bon(load|error|click|mouseover|mouseout|focus|blur|submit"
-    "|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll"
-    "|touchstart|touchend|animationstart|transitionend)\\s*="  // onXXX=
-    "|%(6f|6F)(6e|6E)(4c|6c)(4F|6f)(41|61)(44|64)(%3d|=)"   // %6f%6e%6c%6f%61%64= (onload)
+      "\\bon(load|error|click|mouseover|mouseout|focus|blur|submit"
+      "|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll"
+      "|touchstart|touchend|animationstart|transitionend)\\s*=" // onXXX=
+      "|%(6f|6F)(6e|6E)(4c|6c)(4F|6f)(41|61)(44|64)(%3d|=)"     // %6f%6e%6c%6f%61%64= (onload)
   );
   if (regex_search(lower_data, event_injection_pattern) && !xss_detected)
   {
@@ -308,21 +331,21 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Block");
-      save_xss_result(lower_data, true, "Event Handler Injection", "BLOCK");
+      // save_xss_result(lower_data, true, "Event Handler Injection", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Alert");
-      save_xss_result(lower_data, true, "Event Handler Injection", "ALERT");
+      // save_xss_result(lower_data, true, "Event Handler Injection", "ALERT");
     }
   }
 
   static const regex js_execution_pattern(
-    "\\b(alert|prompt|confirm|eval|setTimeout|setInterval"
-    "|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(" // dangerous functions
-    "|\\b(document\\.cookie|document\\.domain"
-    "|window\\.location|document\\.location|window\\.name)\\b"          // DOM access
-    "|alert\\s*;\\s*pg\\s*\\("                                          // obfuscated alert;pg(
+      "\\b(alert|prompt|confirm|eval|setTimeout|setInterval"
+      "|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(" // dangerous functions
+      "|\\b(document\\.cookie|document\\.domain"
+      "|window\\.location|document\\.location|window\\.name)\\b" // DOM access
+      "|alert\\s*;\\s*pg\\s*\\("                                 // obfuscated alert;pg(
   );
   if (regex_search(lower_data, js_execution_pattern) && !xss_detected)
   {
@@ -332,21 +355,20 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Block");
-      save_xss_result(lower_data, true, "JavaScript Execution", "BLOCK");
+      // save_xss_result(lower_data, true, "JavaScript Execution", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Alert");
-      save_xss_result(lower_data, true, "JavaScript Execution", "ALERT");
+      // save_xss_result(lower_data, true, "JavaScript Execution", "ALERT");
     }
   }
 
   static const regex dangerous_tag_pattern(
-    "<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee"
-    "|isindex|form|button|select|textarea|table|div|span|a|font|center"
-    "|applet|frameset|frame|layer|style|base|link|meta)"
-  );
-  if(regex_search(lower_data, dangerous_tag_pattern) && !xss_detected)
+      "<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee"
+      "|isindex|form|button|select|textarea|table|div|span|a|font|center"
+      "|applet|frameset|frame|layer|style|base|link|meta)");
+  if (regex_search(lower_data, dangerous_tag_pattern) && !xss_detected)
   {
     xss_detected = true;
     cout << "[ALERT] XSS Detected (Dangerous HTML Tag)!" << endl;
@@ -354,22 +376,22 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Block");
-      save_xss_result(lower_data, true, "Dangerous HTML Tag", "BLOCK");
+      // save_xss_result(lower_data, true, "Dangerous HTML Tag", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Alert");
-      save_xss_result(lower_data, true, "Dangerous HTML Tag", "ALERT");
+      // save_xss_result(lower_data, true, "Dangerous HTML Tag", "ALERT");
     }
   }
 
   static const regex obfuscation_pattern(
-    "String\\.fromCharCode"             // String.fromCharCode(...)
-    "|\\\\x[0-9a-fA-F]{2}"             // \x41
-    "|\\\\u[0-9a-fA-F]{4}"             // \u0041
-    "|&#[0-9]+;"                        // &#65;
-    "|&#x[0-9a-fA-F]+;"                // &#x41;
-    "|x-imap4-modified-utf7.*(script|alert|java)"  // IMAP4 UTF-7 bypass
+      "String\\.fromCharCode"                       // String.fromCharCode(...)
+      "|\\\\x[0-9a-fA-F]{2}"                        // \x41
+      "|\\\\u[0-9a-fA-F]{4}"                        // \u0041
+      "|&#[0-9]+;"                                  // &#65;
+      "|&#x[0-9a-fA-F]+;"                           // &#x41;
+      "|x-imap4-modified-utf7.*(script|alert|java)" // IMAP4 UTF-7 bypass
   );
   if (regex_search(lower_data, obfuscation_pattern) && !xss_detected)
   {
@@ -379,19 +401,66 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     {
       block_ip(client_ip, ips_timeout);
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Block");
-      save_xss_result(lower_data, true, "Obfuscation Technique", "BLOCK");
+      // save_xss_result(lower_data, true, "Obfuscation Technique", "BLOCK");
     }
     else
     {
       log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Alert");
-      save_xss_result(lower_data, true, "Obfuscation Technique", "ALERT");
+      // save_xss_result(lower_data, true, "Obfuscation Technique", "ALERT");
     }
   }
 
   // Log bypassed payloads
-  if (!xss_detected)
+  // if (!xss_detected)
+  // {
+  //   save_xss_result(lower_data, false, "", "BYPASSED");
+  // }
+
+  // Broken Access Control
+  bool access_control_detected = false;
+  static const regex path_traversal_pattern(
+    R"((?:\.\.?[/\\]|\.\.[/\\])(?:(?:\.\.?[/\\]|\.\.[/\\]))*|/etc/(?:passwd|shadow|hosts|\.(?:htaccess|ht)|wp-config\.php)|(?:\.htaccess|boot\.ini|winnt|windows\\))"
+  );
+  if (regex_search(lower_data, path_traversal_pattern) && !access_control_detected && !xss_detected)
   {
-    save_xss_result(lower_data, false, "", "BYPASSED");
+    access_control_detected = true;
+    cout << "[ALERT] Directory Traversal Detected" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Block");
+      save_traversal_result(lower_data, true, "Directory Traversal", "BLOCK");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "Directory Traversal", "Alert");
+      save_traversal_result(lower_data, true, "Directory Traversal", "ALERT");
+    }
+  }
+
+  static const regex lfi_pattern(
+    R"((etc\/(passwd|shadow|hosts|group|issue|htgroup)|[c-z]:\\|boot\.ini|win\.ini|\.htaccess|cmd\.exe|global\.asa|desktop\.ini|bin\/(cat|id|ls|sh|bash)|winnt|system32))"
+  );
+  if (regex_search(lower_data, lfi_pattern) && !access_control_detected && !xss_detected)
+  {
+    access_control_detected = true;
+    cout << "[ALERT] System File Access Attempt (LFI) Detected" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "System File Access Attempt (LFI)", "Block");
+      save_traversal_result(lower_data, true, "System File Access Attempt (LFI)", "BLOCK");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "Path Traversal", "System File Access Attempt (LFI)", "Alert");
+      save_traversal_result(lower_data, true, "System File Access Attempt (LFI)", "ALERT");
+    }
+  }
+
+  if (!access_control_detected)
+  {
+    save_traversal_result(lower_data, false, "", "BYPASSED");
   }
 
   // Brute Force
