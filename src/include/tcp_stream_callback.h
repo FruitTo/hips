@@ -223,276 +223,61 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
 
   // Cross Site Scripting (XSS)
   bool xss_detected = false;
-
-  // Script tag patterns: <script>, <script src=...>, etc.
-  static const regex script_tag_pattern("<\\s*script[^>]*>|<\\s*/\\s*script\\s*>", regex::icase);
-  if (regex_search(lower_data, script_tag_pattern) && !xss_detected)
+  static const regex script_injection_pattern(
+    "<\\s*script[^>]*>"               // <script ...>
+    "|<\\s*/\\s*script\\s*>"          // </script>
+    "|%(3c|3C)\\s*script"             // %3cscript (URL-encoded)
+    "|<\\s*\\w+\\s+<\\s*script"       // <tag <script  (split evasion)
+    "|<\\s*/\\s*\\w+\\s+<\\s*script"  // </tag <script
+    "|<\\s*\\w+\\s+</\\s*script"     // <tag </script
+  );
+  if (regex_search(lower_data, script_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Script Tag Injection)!" << endl;
+    cout << "[ALERT] XSS Detected (Script Tag Injection)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Tag Injection", "Block");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Block");
       save_xss_result(lower_data, true, "Script Tag Injection", "BLOCK");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Tag Injection", "Alert");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Script Injection", "Alert");
       save_xss_result(lower_data, true, "Script Tag Injection", "ALERT");
     }
   }
 
-  // Encoded script tags: %3cscript, %3Cscript, etc.
-  static const regex encoded_script_pattern("%(3c|3C)\\s*script", regex::icase);
-  if (regex_search(lower_data, encoded_script_pattern) && !xss_detected)
+  static const regex protocol_injection_pattern(
+    "(javascript|vbscript|data)\\s*:"        // javascript: / vbscript: / data:
+    "|href\\s*=\\s*[\"']?\\s*java\\s*[:&]"   // href="java: หรือ java&colon;
+  );
+  if (regex_search(lower_data, protocol_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (Encoded Script Tag)!" << endl;
+    cout << "[ALERT] XSS Detected (Protocol Injection)" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Script Tag", "Block");
-      save_xss_result(lower_data, true, "Encoded Script Tag", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Block");
+      save_xss_result(lower_data, true, "Protocol Injection", "BLOCK");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Script Tag", "Alert");
-      save_xss_result(lower_data, true, "Encoded Script Tag", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Protocol Injection", "Alert");
+      save_xss_result(lower_data, true, "Protocol Injection", "ALERT");
     }
   }
 
-  // Split/obfuscated script tags: <b <script>, <div <script>, </b <script>, etc.
-  static const regex split_script_pattern("<\\s*\\w+\\s+<\\s*script|<\\s*/\\s*\\w+\\s+<\\s*script|<\\s*\\w+\\s+</\\s*script", regex::icase);
-  if (regex_search(lower_data, split_script_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Split Script Tag)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Split Script Tag", "Block");
-      save_xss_result(lower_data, true, "Split Script Tag", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Split Script Tag", "Alert");
-      save_xss_result(lower_data, true, "Split Script Tag", "ALERT");
-    }
-  }
-
-  // Expression injection: expression(, xexpression, /xpression
-  static const regex expression_pattern("x?\\s*expression\\s*\\(|/\\s*x\\s*pression\\s*\\(", regex::icase);
-  if (regex_search(lower_data, expression_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Expression Injection)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Expression Injection", "Block");
-      save_xss_result(lower_data, true, "Expression Injection", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Expression Injection", "Alert");
-      save_xss_result(lower_data, true, "Expression Injection", "ALERT");
-    }
-  }
-
-  // Style-based XSS: font-family with quotes, style with expression
-  static const regex style_xss_pattern("style\\s*=.*(font-family|expression)[^;]*['\"(]", regex::icase);
-  if (regex_search(lower_data, style_xss_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Style-based XSS)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Style-based XSS", "Block");
-      save_xss_result(lower_data, true, "Style-based XSS", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Style-based XSS", "Alert");
-      save_xss_result(lower_data, true, "Style-based XSS", "ALERT");
-    }
-  }
-
-  // Java URL protocol (without script): java&, java: in href context
-  static const regex java_protocol_pattern("href\\s*=\\s*[\"']?\\s*java\\s*[:&]", regex::icase);
-  if (regex_search(lower_data, java_protocol_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Java Protocol Injection)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Java Protocol Injection", "Block");
-      save_xss_result(lower_data, true, "Java Protocol Injection", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Java Protocol Injection", "Alert");
-      save_xss_result(lower_data, true, "Java Protocol Injection", "ALERT");
-    }
-  }
-
-  // Encoded event handlers: %6f%6eerror=, %6f%6eload=, etc.
-  static const regex encoded_event_pattern("%(6f|6F)(6e|6E)(l|4c)(o|4F)(a|41)(d|44)(%3d|=)", regex::icase);
-  if (regex_search(lower_data, encoded_event_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Encoded Event Handler)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Event Handler", "Block");
-      save_xss_result(lower_data, true, "Encoded Event Handler", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Event Handler", "Alert");
-      save_xss_result(lower_data, true, "Encoded Event Handler", "ALERT");
-    }
-  }
-
-  // IMAP4 charset XSS: x-imap4-modified-utf7 with script keywords
-  static const regex imap4_xss_pattern("x-imap4-modified-utf7.*(script|alert|java)", regex::icase);
-  if (regex_search(lower_data, imap4_xss_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (IMAP4 Charset XSS)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "IMAP4 Charset XSS", "Block");
-      save_xss_result(lower_data, true, "IMAP4 Charset XSS", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "IMAP4 Charset XSS", "Alert");
-      save_xss_result(lower_data, true, "IMAP4 Charset XSS", "ALERT");
-    }
-  }
-
-  // alert;pg pattern (JavaScript obfuscation)
-  static const regex js_obfuscation_pattern("alert\\s*;\\s*pg\\s*\\(", regex::icase);
-  if (regex_search(lower_data, js_obfuscation_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (JS Obfuscation)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JS Obfuscation", "Block");
-      save_xss_result(lower_data, true, "JS Obfuscation", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JS Obfuscation", "Alert");
-      save_xss_result(lower_data, true, "JS Obfuscation", "ALERT");
-    }
-  }
-
-  // Event handler patterns: onload=, onerror=, onclick=, onmouseover=, etc.
-  static const regex event_handler_pattern("\\bon(load|error|click|mouseover|mouseout|focus|blur|submit|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll|touchstart|touchend|animationstart|transitionend)\\s*=", regex::icase);
-  if (regex_search(lower_data, event_handler_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Event Handler Injection)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Block");
-      save_xss_result(lower_data, true, "Event Handler Injection", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Alert");
-      save_xss_result(lower_data, true, "Event Handler Injection", "ALERT");
-    }
-  }
-
-  // JavaScript URI patterns: javascript:, vbscript:, data:text/html, etc.
-  static const regex js_uri_pattern("(javascript|vbscript|data)\\s*:", regex::icase);
-  if (regex_search(lower_data, js_uri_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Malicious Protocol)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Malicious Protocol Injection", "Block");
-      save_xss_result(lower_data, true, "Malicious Protocol Injection", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Malicious Protocol Injection", "Alert");
-      save_xss_result(lower_data, true, "Malicious Protocol Injection", "ALERT");
-    }
-  }
-
-  // HTML tag injection patterns: <img, <iframe, <svg, <object, <embed, <video, etc.
-  static const regex html_tag_pattern("<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee|isindex|form|button|select|textarea|table|div|span|a|font|center|applet|frameset|frame|layer|style|base|link|meta)", regex::icase);
-  if (regex_search(lower_data, html_tag_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (HTML Tag Injection)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "HTML Tag Injection", "Block");
-      save_xss_result(lower_data, true, "HTML Tag Injection", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "HTML Tag Injection", "Alert");
-      save_xss_result(lower_data, true, "HTML Tag Injection", "ALERT");
-    }
-  }
-
-  // Alert/prompt/confirm/eval patterns
-  static const regex dangerous_func_pattern("\\b(alert|prompt|confirm|eval|setTimeout|setInterval|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(", regex::icase);
-  if (regex_search(lower_data, dangerous_func_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Dangerous Function Call)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous Function Call", "Block");
-      save_xss_result(lower_data, true, "Dangerous Function Call", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous Function Call", "Alert");
-      save_xss_result(lower_data, true, "Dangerous Function Call", "ALERT");
-    }
-  }
-
-  // String encoding patterns: String.fromCharCode, hex encoding, HTML entities
-  static const regex encoding_pattern("String\\.fromCharCode|\\\\x[0-9a-fA-F]{2}|\\\\u[0-9a-fA-F]{4}|&#[0-9]+;|&#x[0-9a-fA-F]+;", regex::icase);
-  if (regex_search(lower_data, encoding_pattern) && !xss_detected)
-  {
-    xss_detected = true;
-    cout << "[ALERT] XSS Detected (Encoded Payload)!" << endl;
-    if (app_config.mode)
-    {
-      block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Payload", "Block");
-      save_xss_result(lower_data, true, "Encoded Payload", "BLOCK");
-    }
-    else
-    {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Encoded Payload", "Alert");
-      save_xss_result(lower_data, true, "Encoded Payload", "ALERT");
-    }
-  }
-
-  // Expression/CSS injection patterns
-  static const regex css_injection_pattern("expression\\s*\\(|url\\s*\\(\\s*javascript:|behavior\\s*:|moz-binding\\s*:", regex::icase);
-  if (regex_search(lower_data, css_injection_pattern) && !xss_detected)
+  static const regex css_xss_pattern(
+    "x?\\s*expression\\s*\\("                           // expression( / xpression(
+    "|/\\s*x\\s*pression\\s*\\("                        // /xpression( (split evasion)
+    "|style\\s*=.*(font-family|expression)[^;]*['\"(]"  // style= ที่มี expression
+    "|url\\s*\\(\\s*javascript:"                        // url(javascript:
+    "|behavior\\s*:"                                    // behavior: (IE)
+    "|moz-binding\\s*:"                                 // -moz-binding: (Firefox)
+  );
+  if (regex_search(lower_data, css_xss_pattern) && !xss_detected)
   {
     xss_detected = true;
     cout << "[ALERT] XSS Detected (CSS Injection)!" << endl;
@@ -509,22 +294,97 @@ void on_client_data(Stream &stream, unordered_map<string, HTTP_State> &httpMap, 
     }
   }
 
-  // DOM manipulation patterns
-  static const regex dom_manipulation_pattern("\\b(document\\.cookie|document\\.domain|window\\.location|document\\.location|window\\.name)\\b", regex::icase);
-  if (regex_search(lower_data, dom_manipulation_pattern) && !xss_detected)
+  static const regex event_injection_pattern(
+    "\\bon(load|error|click|mouseover|mouseout|focus|blur|submit"
+    "|change|input|keydown|keyup|keypress|dblclick|drag|drop|scroll"
+    "|touchstart|touchend|animationstart|transitionend)\\s*="  // onXXX=
+    "|%(6f|6F)(6e|6E)(4c|6c)(4F|6f)(41|61)(44|64)(%3d|=)"   // %6f%6e%6c%6f%61%64= (onload)
+  );
+  if (regex_search(lower_data, event_injection_pattern) && !xss_detected)
   {
     xss_detected = true;
-    cout << "[ALERT] XSS Detected (DOM Manipulation)!" << endl;
+    cout << "[ALERT] XSS Detected (Event Handler Injection)!" << endl;
     if (app_config.mode)
     {
       block_ip(client_ip, ips_timeout);
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "DOM Manipulation", "Block");
-      save_xss_result(lower_data, true, "DOM Manipulation", "BLOCK");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Block");
+      save_xss_result(lower_data, true, "Event Handler Injection", "BLOCK");
     }
     else
     {
-      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "DOM Manipulation", "Alert");
-      save_xss_result(lower_data, true, "DOM Manipulation", "ALERT");
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Event Handler Injection", "Alert");
+      save_xss_result(lower_data, true, "Event Handler Injection", "ALERT");
+    }
+  }
+
+  static const regex js_execution_pattern(
+    "\\b(alert|prompt|confirm|eval|setTimeout|setInterval"
+    "|Function|document\\.write|innerHTML|outerHTML|execScript)\\s*\\(" // dangerous functions
+    "|\\b(document\\.cookie|document\\.domain"
+    "|window\\.location|document\\.location|window\\.name)\\b"          // DOM access
+    "|alert\\s*;\\s*pg\\s*\\("                                          // obfuscated alert;pg(
+  );
+  if (regex_search(lower_data, js_execution_pattern) && !xss_detected)
+  {
+    xss_detected = true;
+    cout << "[ALERT] XSS Detected (JavaScript Execution)!" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Block");
+      save_xss_result(lower_data, true, "JavaScript Execution", "BLOCK");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "JavaScript Execution", "Alert");
+      save_xss_result(lower_data, true, "JavaScript Execution", "ALERT");
+    }
+  }
+
+  static const regex dangerous_tag_pattern(
+    "<\\s*(img|iframe|svg|object|embed|video|audio|body|input|marquee"
+    "|isindex|form|button|select|textarea|table|div|span|a|font|center"
+    "|applet|frameset|frame|layer|style|base|link|meta)"
+  );
+  if(regex_search(lower_data, dangerous_tag_pattern) && !xss_detected)
+  {
+    xss_detected = true;
+    cout << "[ALERT] XSS Detected (Dangerous HTML Tag)!" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Block");
+      save_xss_result(lower_data, true, "Dangerous HTML Tag", "BLOCK");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Dangerous HTML Tag", "Alert");
+      save_xss_result(lower_data, true, "Dangerous HTML Tag", "ALERT");
+    }
+  }
+
+  static const regex obfuscation_pattern(
+    "String\\.fromCharCode"             // String.fromCharCode(...)
+    "|\\\\x[0-9a-fA-F]{2}"             // \x41
+    "|\\\\u[0-9a-fA-F]{4}"             // \u0041
+    "|&#[0-9]+;"                        // &#65;
+    "|&#x[0-9a-fA-F]+;"                // &#x41;
+    "|x-imap4-modified-utf7.*(script|alert|java)"  // IMAP4 UTF-7 bypass
+  );
+  if (regex_search(lower_data, obfuscation_pattern) && !xss_detected)
+  {
+    xss_detected = true;
+    cout << "[ALERT] XSS Detected (Obfuscation Technique)!" << endl;
+    if (app_config.mode)
+    {
+      block_ip(client_ip, ips_timeout);
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Block");
+      save_xss_result(lower_data, true, "Obfuscation Technique", "BLOCK");
+    }
+    else
+    {
+      log_attack_to_db(conn, client_ip, client_port, server_ip, server_port, protocol, "XSS", "Obfuscation Technique", "Alert");
+      save_xss_result(lower_data, true, "Obfuscation Technique", "ALERT");
     }
   }
 

